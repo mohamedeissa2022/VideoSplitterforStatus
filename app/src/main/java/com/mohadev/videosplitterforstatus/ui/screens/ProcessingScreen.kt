@@ -5,10 +5,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.work.WorkInfo
+import com.mohadev.videosplitterforstatus.R
 
 @Composable
 fun ProcessingScreen(
@@ -23,12 +25,20 @@ fun ProcessingScreen(
     val progress = workInfo?.progress?.getInt("PROGRESS", 0) ?: 0
     val state = workInfo?.state
 
-    // 3. Navigate away when finished
-    LaunchedEffect(state) {
-        if (state == WorkInfo.State.SUCCEEDED) {
-            val outputDir = workInfo?.outputData?.getString("OUTPUT_DIR") ?: ""
+    var navigated by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state)
+    {
+        if (state == WorkInfo.State.SUCCEEDED && !navigated)
+        {
+            navigated = true
+
+            val outputDir =
+                workInfo?.outputData?.getString("OUTPUT_DIR") ?: ""
+
             onProcessComplete(outputDir)
-        } else if (state == WorkInfo.State.CANCELLED) {
+        } else if ((state == WorkInfo.State.CANCELLED || state == WorkInfo.State.FAILED) && !navigated) {
+            navigated = true
             onProcessCancelled()
         }
     }
@@ -43,7 +53,7 @@ fun ProcessingScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Splitting Video...",
+                text = stringResource(R.string.splitting_video),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -69,7 +79,7 @@ fun ProcessingScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Please keep the app open",
+                text = stringResource(R.string.keep_app_open),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -83,7 +93,7 @@ fun ProcessingScreen(
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Cancel", color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.cancel), color = MaterialTheme.colorScheme.error)
             }
         }
     }

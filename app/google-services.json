@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "543383657802",
+    "project_id": "video-splitter-559fc",
+    "storage_bucket": "video-splitter-559fc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:543383657802:android:8d2aa8b03023985af735b3",
+        "android_client_info": {
+          "package_name": "com.mohadev.videosplitterforstatus"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBcjEX4O-Df2sK9hDrKB4ZUpsjlTep6n84"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,59 @@
+<resources>
+    <string name="app_name">قاص الفيديو للحالات</string>
+    <string name="home_title">قاص الفيديو</string>
+    <string name="quick_split">قص سريع</string>
+    <string name="custom_split">قص مخصص</string>
+    <string name="seconds_label">ثواني</string>
+    <string name="split_button">قص</string>
+    <string name="history_content_description">السجل</string>
+    <string name="settings_content_description">الإعدادات</string>
+    <string name="seconds_unit">%1$d ثانية</string>
+    <string name="select_video_title">اختر فيديو</string>
+    <string name="choose_video_instruction">اختر فيديو لقصّه</string>
+    <string name="supports_formats">يدعم MP4، MKV، والمزيد</string>
+    <string name="open_gallery">فتح المعرض</string>
+    <string name="video_size">الحجم: %1$s</string>
+    <string name="split_original">قص الأصلي</string>
+    <string name="compress_split">ضغط وقص</string>
+    <string name="pick_another">اختر فيديو آخر</string>
+    <string name="compressing_video_title">جاري ضغط الفيديو</string>
+    <string name="processing_wait">جاري المعالجة… يرجى الانتظار.</string>
+    <string name="splitting_video">جاري قص الفيديو...</string>
+    <string name="keep_app_open">يرجى إبقاء التطبيق مفتوحاً</string>
+    <string name="cancel">إلغاء</string>
+    <string name="split_complete">اكتمل القص!</string>
+    <string name="select_all">تحديد الكل</string>
+    <string name="deselect_all">إلغاء تحديد الكل</string>
+    <string name="share_selected">مشاركة المحدد (%1$d)</string>
+    <string name="split_videos_label">الفيديوهات المقصوصة</string>
+    <string name="no_files_found">لم يتم العور على ملفات.</string>
+    <string name="share_content_description">مشاركة</string>
+    <string name="split_history_title">سجل القص</string>
+    <string name="no_history">لا يوجد سجل بعد</string>
+    <string name="delete_history_title">حذف السجل</string>
+    <string name="delete_history_confirmation">هل أنت متأكد أنك تريد حذف هذه العملية وجميع ملفاتها؟ لا يمكن التراجع عن هذا الإجراء.</string>
+    <string name="delete">حذف</string>
+    <string name="no_clips_found">لم يتم العثور على مقاطع</string>
+    <string name="share_all_clips">مشاركة جميع المقاطع</string>
+    <string name="back_content_description">رجوع</string>
+
+    <string name="compression_quality">جودة الضغط</string>
+    <string name="quality_low">منخفضة (حجم أصغر)</string>
+    <string name="quality_medium">متوسطة (متوازنة)</string>
+    <string name="quality_high">عالية (جودة أفضل)</string>
+
+    <string name="update_title">تحديث جديد متوفر</string>
+    <string name="update_button">تحديث الآن</string>
+    <string name="update_later">لاحقاً</string>
+
+    <string name="rate_title">قيم تطبيقنا</string>
+    <string name="rate_message">إذا كنت تستمتع باستخدام قاص الفيديو، يرجى تخصيص لحظة لتقييمنا على متجر بلاي. هذا يساعدنا كثيراً!</string>
+    <string name="rate_now">قيم الآن</string>
+    <string name="remind_later">ذكرني لاحقاً</string>
+
+    <string name="notif_channel_name">معالجة الفيديو</string>
+    <string name="notif_split_complete_title">اكتمل القص</string>
+    <string name="notif_split_complete_msg">تم قص الفيديو الخاص بك بنجاح.</string>
+    <string name="notif_compress_complete_title">اكتمل الضغط</string>
+    <string name="notif_compress_complete_msg">تم ضغط الفيديو الخاص بك بنجاح.</string>
+</resources>

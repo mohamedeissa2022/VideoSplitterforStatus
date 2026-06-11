@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.mohadev.videosplitterforstatus" />
+                  <option name="mobileSdkAppId" value="1:543383657802:android:8d2aa8b03023985af735b3" />
+                  <option name="projectId" value="video-splitter-559fc" />
+                  <option name="projectNumber" value="543383657802" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

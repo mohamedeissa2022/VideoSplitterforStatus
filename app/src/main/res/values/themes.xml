@@ -2,4 +2,11 @@
 <resources>
 
     <style name="Theme.VideoSplitterForStatus" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Modern Splash Screen Theme -->
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@android:color/white</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.VideoSplitterForStatus</item>
+    </style>
 </resources>

@@ -1,5 +1,6 @@
 package com.mohadev.videosplitterforstatus.ui.screens
 
+import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
@@ -27,6 +28,7 @@ class HomeViewModel @Inject constructor(
     val currentWorkId: UUID? get() = _currentWorkId.value
 
     fun startVideoSplit(videoPath: String, videoName: String, durationInSeconds: Int) {
+        Log.d("VideoSplit", "startVideoSplit called")
         val inputData = Data.Builder()
             .putString("INPUT_PATH", videoPath)
             .putString("VIDEO_NAME", videoName)
