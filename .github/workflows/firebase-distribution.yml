@@ -2,7 +2,10 @@ name: Build & Upload APK to Firebase
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - master
+
+  workflow_dispatch:
 
 jobs:
   build:
