@@ -1,4 +1,4 @@
-package com.mohadev.videosplitterforstatus.ui.screens
+package com.mohadev.videosplitterforstatus.ui.viewmodel
 
 import android.net.Uri
 import android.util.Log
@@ -7,19 +7,21 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.asFlow
 import androidx.work.*
+import com.mohadev.videosplitterforstatus.domain.usecase.CompressVideoUseCase
+import com.mohadev.videosplitterforstatus.ui.screens.VideoBranding
 import com.mohadev.videosplitterforstatus.workers.VideoSplitWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
 import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val workManager: WorkManager
+    private val workManager: WorkManager,
+    val compressVideoUseCase: CompressVideoUseCase
 ) : ViewModel() {
 
     companion object {
@@ -27,7 +29,6 @@ class HomeViewModel @Inject constructor(
         const val UNIQUE_WORK_NAME = "DynamicVideoSplitter"
     }
 
-    // Expose all active work for the "Production Monitor"
     @OptIn(ExperimentalCoroutinesApi::class)
     fun getAllActiveWorkFlow(): Flow<List<WorkInfo>> {
         return workManager.getWorkInfosByTagLiveData(WORK_TAG).asFlow()
@@ -40,11 +41,9 @@ class HomeViewModel @Inject constructor(
     ) {
         Log.d("DynamicSplit", "Queueing ${brandingList.size} workers")
 
-        // 🛠️ Dynamic Queue Strategy:
-        // We chain workers so they run sequentially, but each has its own lifecycle
         var continuation = workManager.beginUniqueWork(
             UNIQUE_WORK_NAME,
-            ExistingWorkPolicy.APPEND_OR_REPLACE, // APPEND for "Dynamic" addition
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
             createWorkerRequest(brandingList.first(), durationInSeconds)
         )
 

@@ -1,4 +1,4 @@
-package com.mohadev.videosplitterforstatus.domain
+package com.mohadev.videosplitterforstatus.data.service
 
 import android.content.Context
 import android.media.MediaCodec
@@ -6,7 +6,6 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.net.Uri
-import android.util.Log
 import java.io.File
 import java.nio.ByteBuffer
 
@@ -23,7 +22,7 @@ fun splitVideoWithProgress(
     try {
         val pfd = context.contentResolver.openFileDescriptor(uri, "r")
         if (pfd == null) {
-            Log.e("VideoSplit", "Could not open file descriptor for URI: $uri")
+            android.util.Log.e("VideoSplit", "Could not open file descriptor for URI: $uri")
             return
         }
         
@@ -37,7 +36,7 @@ fun splitVideoWithProgress(
 
         val trackCount = extractor.trackCount
         if (trackCount == 0) {
-            Log.e("VideoSplit", "No tracks found in video")
+            android.util.Log.e("VideoSplit", "No tracks found in video")
             return
         }
 
@@ -52,7 +51,7 @@ fun splitVideoWithProgress(
         }
 
         if (videoTrack == -1) {
-            Log.e("VideoSplit", "No video track found")
+            android.util.Log.e("VideoSplit", "No video track found")
             return
         }
 
@@ -91,7 +90,7 @@ fun splitVideoWithProgress(
                         it.stop()
                         it.release()
                     } catch (e: Exception) {
-                        Log.e("VideoSplit", "Error closing muxer", e)
+                        android.util.Log.e("VideoSplit", "Error closing muxer", e)
                     }
                 }
                 muxer = null
@@ -127,7 +126,7 @@ fun splitVideoWithProgress(
                     audioTrack -> if (audioMuxTrack != -1) muxer.writeSampleData(audioMuxTrack, buffer, bufferInfo)
                 }
             } catch (e: Exception) {
-                Log.e("VideoSplit", "Muxer write error", e)
+                android.util.Log.e("VideoSplit", "Muxer write error", e)
             }
 
             if (durationUs > 0 && sampleTrackIndex == videoTrack) {
@@ -146,11 +145,11 @@ fun splitVideoWithProgress(
                 it.stop()
                 it.release()
             } catch (e: Exception) {
-                Log.e("VideoSplit", "Error closing final muxer", e)
+                android.util.Log.e("VideoSplit", "Error closing final muxer", e)
             }
         }
     } catch (e: Exception) {
-        Log.e("VideoSplit", "Critical splitter crash", e)
+        android.util.Log.e("VideoSplit", "Critical splitter crash", e)
     } finally {
         try { extractor.release() } catch (e: Exception) {}
     }

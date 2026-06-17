@@ -39,7 +39,7 @@ import coil.decode.VideoFrameDecoder
 import coil.request.ImageRequest
 import coil.request.videoFrameMillis
 import com.mohadev.videosplitterforstatus.R
-import com.mohadev.videosplitterforstatus.domain.VideoCompressor
+import com.mohadev.videosplitterforstatus.ui.viewmodel.HomeViewModel
 import java.io.File
 
 data class VideoBranding(
@@ -65,6 +65,8 @@ fun VideoPickerScreen(
     // UI Helpers
     var applyToAll by remember { mutableStateOf(false) }
     var compressedResults by remember { mutableStateOf<List<File>>(emptyList()) }
+    
+    val homeViewModel: HomeViewModel = hiltViewModel()
 
     val mediaPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(10),
@@ -208,7 +210,6 @@ fun VideoPickerScreen(
                         Text("Split Original", fontWeight = FontWeight.Bold)
                     }
                     
-                    // RE-ADDED COMPRESSION BUTTON
                     OutlinedButton(
                         onClick = { showQualitySelectionDialog = true },
                         modifier = Modifier.weight(1f).height(60.dp),
@@ -261,7 +262,7 @@ fun VideoPickerScreen(
                     LaunchedEffect(Unit) {
                         val results = mutableListOf<File>()
                         selectedBrandingList.forEach { branding ->
-                            val res = VideoCompressor.compressVideo(context, branding.uri.toString(), compressionQuality) {}
+                            val res = homeViewModel.compressVideoUseCase(context, branding.uri.toString(), compressionQuality)
                             if (res != null) results.add(res)
                         }
                         compressedResults = results
