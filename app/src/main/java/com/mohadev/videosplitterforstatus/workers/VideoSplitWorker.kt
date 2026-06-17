@@ -15,87 +15,107 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.mohadev.videosplitterforstatus.MainActivity
 import com.mohadev.videosplitterforstatus.R
-import com.mohadev.videosplitterforstatus.domain.AppDatabase
+import com.mohadev.videosplitterforstatus.data.local.AppDatabase
+import com.mohadev.videosplitterforstatus.data.local.SplitHistory
+import com.mohadev.videosplitterforstatus.data.repository.HistoryRepository
+import com.mohadev.videosplitterforstatus.data.repository.VideoProcessorRepository
 import com.mohadev.videosplitterforstatus.domain.DeviceSpecs
-import com.mohadev.videosplitterforstatus.domain.SplitHistory
-import com.mohadev.videosplitterforstatus.domain.splitVideoWithProgress
+import com.mohadev.videosplitterforstatus.domain.usecase.SplitVideoUseCase
 import java.io.File
 import androidx.room.Room
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.ReturnCode
 
-/**
- * Dynamic Dynamic Worker: Processes ONE video per instance.
- * Highly scalable for large batches.
- */
 class VideoSplitWorker(
     context: Context,
     workerParams: WorkerParameters
 ) : CoroutineWorker(context, workerParams) {
 
-    private val notificationId = (System.currentTimeMillis() % 10000).toInt()
-    private val channelId = "dynamic_processing_channel"
+    private fun getDb(): AppDatabase {
+        return Room.databaseBuilder(applicationContext, AppDatabase::class.java, "video_splitter_db")
+            .fallbackToDestructiveMigration()
+            .build()
+    }
 
     override suspend fun doWork(): Result {
-        // 1. Get Dynamic Input Data
-        val inputUriString = inputData.getString("INPUT_PATH") ?: return Result.failure()
-        val inputUri = Uri.parse(inputUriString)
-        val duration = inputData.getInt("DURATION", 30)
-        val logoUriString = inputData.getString("LOGO_PATH")
-        val brandingText = inputData.getString("BRANDING_TEXT") ?: ""
-        val videoName = inputUri.lastPathSegment ?: "Split Video"
-
-        // 2. Promote to Foreground (Dynamic Priority)
-        // This ensures the worker isn't killed by the system during long tasks
-        setForeground(createForegroundInfo(videoName))
-
-        val timestamp = System.currentTimeMillis()
-        val outputDir = File(applicationContext.getExternalFilesDir(null), "VideoSplitter/Queue_$timestamp")
-        if (!outputDir.exists()) outputDir.mkdirs()
-
         return try {
-            // 🛠️ Dynamic Specs
-            val profile = DeviceSpecs.getProfile(applicationContext)
-            val params = DeviceSpecs.getEncodingParams(profile)
+            val batchDataString = inputData.getString("BATCH_DATA") ?: return Result.failure()
+            val duration = inputData.getInt("DURATION", 30)
 
-            Log.d("DynamicWorker", "Processing: $videoName with profile: $profile")
+            val batchList = batchDataString.split(";").mapNotNull { item ->
+                try {
+                    val parts = item.split("|")
+                    if (parts.isEmpty() || parts[0].isEmpty()) return@mapNotNull null
+                    val uri = Uri.parse(parts[0])
+                    val logo = if (parts.size > 1 && parts[1].isNotEmpty()) Uri.parse(parts[1]) else null
+                    val text = if (parts.size > 2) parts[2] else ""
+                    Triple(uri, logo, text)
+                } catch (e: Exception) { null }
+            }
 
-            if (logoUriString != null || brandingText.isNotEmpty()) {
-                splitWithBranding(
-                    inputUri, outputDir, duration, 
-                    logoUriString?.let { Uri.parse(it) }, 
-                    brandingText, params
-                )
-            } else {
-                splitVideoWithProgress(
-                    applicationContext, inputUri, outputDir, duration, "dyn"
-                ) { progress ->
-                    setProgressAsync(workDataOf("PROGRESS" to progress, "VIDEO_NAME" to videoName))
+            if (batchList.isEmpty()) return Result.failure()
+
+            val timestamp = System.currentTimeMillis()
+            val outputDir = File(applicationContext.getExternalFilesDir(null), "VideoSplitter/Batch_$timestamp")
+            if (!outputDir.exists()) outputDir.mkdirs()
+
+            var overallSuccess = true
+
+            batchList.forEachIndexed { index, (inputUri, logoUri, brandingText) ->
+                try {
+                    val videoName = inputUri.lastPathSegment ?: "Video_${index + 1}"
+                    updateProgress(0, index, batchList.size, videoName)
+
+                    if (logoUri != null || brandingText.isNotEmpty()) {
+                        splitWithBranding(inputUri, outputDir, duration, logoUri, brandingText, index, batchList.size)
+                    } else {
+                        // Use split logic from repository (abstracted)
+                        VideoProcessorRepository().split(applicationContext, inputUri, outputDir, duration, "v$index") { progress ->
+                            updateProgress(progress, index, batchList.size, videoName)
+                        }
+                    }
+
+                    val database = getDb()
+                    database.historyDao().insert(SplitHistory(
+                        originalVideoUri = inputUri.toString(), 
+                        videoName = videoName, 
+                        timestamp = timestamp, 
+                        outputFolderPath = outputDir.absolutePath, 
+                        segmentDuration = duration
+                    ))
+                    database.close()
+
+                } catch (e: Exception) {
+                    Log.e("Worker", "Batch item $index crashed", e)
+                    overallSuccess = false
                 }
             }
 
-            // Save to history
-            saveHistory(inputUriString, videoName, outputDir.absolutePath, duration)
-
-            Result.success(workDataOf("OUTPUT_DIR" to outputDir.absolutePath))
+            if (overallSuccess) {
+                showCompletionNotification(outputDir.absolutePath)
+                Result.success(workDataOf("OUTPUT_DIR" to outputDir.absolutePath))
+            } else {
+                Result.failure()
+            }
         } catch (e: Exception) {
-            Log.e("DynamicWorker", "Failed processing $videoName", e)
+            Log.e("Worker", "Worker global crash", e)
             Result.failure()
         }
     }
 
-    private suspend fun saveHistory(uri: String, name: String, path: String, dur: Int) {
-        val db = Room.databaseBuilder(applicationContext, AppDatabase::class.java, "video_splitter_db").build()
-        db.historyDao().insert(SplitHistory(originalVideoUri = uri, videoName = name, timestamp = System.currentTimeMillis(), outputFolderPath = path, segmentDuration = dur))
-        db.close()
+    private fun updateProgress(progress: Int, current: Int, total: Int, name: String) {
+        setProgressAsync(workDataOf("PROGRESS" to progress, "CURRENT_INDEX" to current, "TOTAL_VIDEOS" to total, "CURRENT_VIDEO_NAME" to name))
     }
 
-    private fun splitWithBranding(inputUri: Uri, outputDir: File, segmentSeconds: Int, logoUri: Uri?, text: String, params: com.mohadev.videosplitterforstatus.domain.EncodingParams) {
+    private fun splitWithBranding(inputUri: Uri, outputDir: File, segmentSeconds: Int, logoUri: Uri?, text: String, batchIndex: Int, totalInBatch: Int) {
         val context = applicationContext
         val resolvedFile = getFileFromUri(context, inputUri, "split") ?: return
         val logoFile = logoUri?.let { getFileFromUri(context, it, "logo") }
-        val videoName = inputUri.lastPathSegment ?: "Processing"
+        val videoName = inputUri.lastPathSegment ?: "Video_${batchIndex + 1}"
         
+        val profile = DeviceSpecs.getProfile(applicationContext)
+        val params = DeviceSpecs.getEncodingParams(profile)
+
         try {
             val infoSession = FFmpegKit.execute("-i \"${resolvedFile.absolutePath}\"")
             val match = "Duration: (\\d{2}):(\\d{2}):(\\d{2})\\.".toRegex().find(infoSession.allLogsAsString)
@@ -108,7 +128,7 @@ class VideoSplitWorker(
             for (i in 0 until parts) {
                 val start = i * segmentSeconds
                 if (start >= totalSeconds && i > 0) break
-                val outputFile = File(outputDir, "part_$i.mp4")
+                val outputFile = File(outputDir, "v${batchIndex}_part_$i.mp4")
                 
                 val complexFilter = when {
                     logoFile != null && text.isNotEmpty() -> "[1:v]scale=100:-1[logo];[0:v][logo]overlay=W-w-20:H-h-50[bg];[bg]drawtext=text='$text':x=W-tw-20:y=H-th-15:fontsize=24:fontcolor=white:box=1:boxcolor=black@0.4,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p"
@@ -117,10 +137,12 @@ class VideoSplitWorker(
                 }
 
                 val inputArgs = if (logoFile != null) "-i \"${resolvedFile.absolutePath}\" -i \"${logoFile.absolutePath}\"" else "-i \"${resolvedFile.absolutePath}\""
-                val command = "-y -threads ${params.threads} -ss $start -t $segmentSeconds $inputArgs -filter_complex \"$complexFilter\" -vcodec h264_mediacodec -b:v ${params.videoBitrate} -acodec aac -b:a ${params.audioBitrate} \"${outputFile.absolutePath}\""
+                val command = "-y -threads ${params.threads} -ss $start -t $segmentSeconds $inputArgs -filter_complex \"$complexFilter\" -vcodec h264_mediacodec -b:v ${params.videoBitrate} -acodec aac \"${outputFile.absolutePath}\""
                 
-                FFmpegKit.execute(command)
-                setProgressAsync(workDataOf("PROGRESS" to ((i + 1).toFloat() / parts * 100).toInt(), "VIDEO_NAME" to videoName))
+                if (!ReturnCode.isSuccess(FFmpegKit.execute(command).returnCode)) {
+                    FFmpegKit.execute("-y -threads ${params.threads} -ss $start -t $segmentSeconds $inputArgs -filter_complex \"$complexFilter\" -vcodec mpeg4 -b:v ${params.videoBitrate} -acodec aac \"${outputFile.absolutePath}\"" )
+                }
+                updateProgress(((i + 1).toFloat() / parts * 100).toInt().coerceAtMost(100), batchIndex, totalInBatch, videoName)
             }
         } finally {
             resolvedFile.delete()
@@ -128,21 +150,22 @@ class VideoSplitWorker(
         }
     }
 
-    private fun createForegroundInfo(videoName: String): ForegroundInfo {
+    private fun showCompletionNotification(outputDir: String) {
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        
+        val channelId = "video_processing_channel"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            notificationManager.createNotificationChannel(NotificationChannel(channelId, "Active Production", NotificationManager.IMPORTANCE_LOW))
+            notificationManager.createNotificationChannel(NotificationChannel(channelId, applicationContext.getString(R.string.notif_channel_name), NotificationManager.IMPORTANCE_HIGH))
         }
-
-        val notification = NotificationCompat.Builder(applicationContext, channelId)
-            .setContentTitle("Splitting: $videoName")
-            .setTicker("Processing Video")
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setOngoing(true)
-            .build()
-
-        return ForegroundInfo(notificationId, notification)
+        val intent = Intent(applicationContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra("TARGET_ROUTE", "results/${Uri.encode(outputDir)}")
+        }
+        val pendingIntent = PendingIntent.getActivity(applicationContext, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val notification = NotificationCompat.Builder(applicationContext, channelId).setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(applicationContext.getString(R.string.notif_split_complete_title))
+            .setContentText(applicationContext.getString(R.string.notif_split_complete_msg))
+            .setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true).setContentIntent(pendingIntent).build()
+        try { notificationManager.notify(1, notification) } catch (e: SecurityException) { }
     }
 
     private fun getFileFromUri(context: Context, uri: Uri, prefix: String): File? {

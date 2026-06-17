@@ -35,10 +35,11 @@ import coil.request.videoFrameMillis
 import com.mohadev.videosplitterforstatus.R
 import com.mohadev.videosplitterforstatus.domain.model.VideoItem
 import com.mohadev.videosplitterforstatus.data.local.SplitHistory
-import com.mohadev.videosplitterforstatus.domain.loadVideosFromDir
+import com.mohadev.videosplitterforstatus.data.service.VideoLoader
 import com.mohadev.videosplitterforstatus.ui.viewmodel.HistoryViewModel
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.ui.platform.LocalLocale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -126,7 +127,7 @@ fun HistoryItemCard(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val splitVideos = remember(history.outputFolderPath, expanded) {
-        if (expanded) loadVideosFromDir(history.outputFolderPath, context) else emptyList()
+        if (expanded) VideoLoader.loadVideosFromDir(history.outputFolderPath, context) else emptyList()
     }
 
     Card(
@@ -173,7 +174,7 @@ fun HistoryItemCard(
                         maxLines = 1
                     )
                     Text(
-                        text = SimpleDateFormat("MMM dd, yyyy • HH:mm", Locale.getDefault()).format(Date(history.timestamp)),
+                        text = SimpleDateFormat("MMM dd, yyyy • HH:mm", LocalLocale.current.platformLocale).format(Date(history.timestamp)),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -1,4 +1,4 @@
-package com.mohadev.videosplitterforstatus.domain
+package com.mohadev.videosplitterforstatus.data.service
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,6 +10,8 @@ import androidx.core.app.NotificationCompat
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.ReturnCode
 import com.mohadev.videosplitterforstatus.R
+import com.mohadev.videosplitterforstatus.domain.DeviceProfile
+import com.mohadev.videosplitterforstatus.domain.DeviceSpecs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -23,9 +25,8 @@ object VideoCompressor {
         onProgress: (Float) -> Unit = {}
     ): File? = withContext(Dispatchers.IO) {
         
-        Log.d("VideoCompressor", "Process Start: $inputUriString with bitrate $targetBitrate")
+        Log.d("VideoCompressor", "Process Start: $inputUriString")
 
-        // 🛠️ Dynamic Tuning for Compression (80% Rule)
         val profile = DeviceSpecs.getProfile(context)
         val params = DeviceSpecs.getEncodingParams(profile)
         val threads = params.threads

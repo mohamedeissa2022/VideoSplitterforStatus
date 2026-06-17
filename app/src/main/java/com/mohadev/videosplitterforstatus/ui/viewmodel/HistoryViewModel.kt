@@ -1,4 +1,4 @@
-package com.mohadev.videosplitterforstatus.ui.screens
+package com.mohadev.videosplitterforstatus.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

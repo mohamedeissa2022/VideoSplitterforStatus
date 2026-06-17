@@ -36,7 +36,6 @@ import com.mohadev.videosplitterforstatus.ui.theme.VideoSplitterForStatusTheme
 import com.mohadev.videosplitterforstatus.ui.viewmodel.HomeViewModel
 import com.mohadev.videosplitterforstatus.ui.viewmodel.HistoryViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import java.util.Date
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {

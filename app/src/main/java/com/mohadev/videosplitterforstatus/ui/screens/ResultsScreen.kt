@@ -1,6 +1,5 @@
 package com.mohadev.videosplitterforstatus.ui.screens
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.text.format.Formatter
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -41,8 +38,8 @@ import coil.decode.VideoFrameDecoder
 import coil.request.ImageRequest
 import coil.request.videoFrameMillis
 import com.mohadev.videosplitterforstatus.R
-import com.mohadev.videosplitterforstatus.VideoItem
-import com.mohadev.videosplitterforstatus.domain.loadVideosGrouped
+import com.mohadev.videosplitterforstatus.domain.model.VideoItem
+import com.mohadev.videosplitterforstatus.data.service.VideoLoader
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,12 +49,11 @@ fun ResultsScreen(
     context: Context = LocalContext.current,
     onNavigateHome: () -> Unit
 ) {
-    // Grouped videos by original source: "v0" -> List of parts, "v1" -> List of parts
     val groupedVideos = remember { mutableStateOf<Map<String, List<VideoItem>>>(emptyMap()) }
     var showPlayerDialog by remember { mutableStateOf<VideoItem?>(null) }
 
     LaunchedEffect(outputDirPath) {
-        groupedVideos.value = loadVideosGrouped(outputDirPath, context)
+        groupedVideos.value = VideoLoader.loadVideosGrouped(outputDirPath, context)
     }
 
     Scaffold(
@@ -91,7 +87,6 @@ fun ResultsScreen(
                 modifier = Modifier.fillMaxSize().padding(paddingValues),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
-                // Get sorted keys to maintain batch order
                 val sortedKeys = groupedVideos.value.keys.sortedBy { it.removePrefix("v").toIntOrNull() ?: 0 }
                 
                 sortedKeys.forEach { videoKey ->
@@ -235,6 +230,31 @@ fun VideoPlayerDialog(video: VideoItem, onDismiss: () -> Unit) {
             AndroidView(factory = { ctx -> PlayerView(ctx).apply { player = exoPlayer; useController = true } }, modifier = Modifier.fillMaxSize())
         }
     }
+}
+
+@Composable
+fun SocialShareButton(icon: ImageVector, label: String, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Surface(onClick = onClick, modifier = modifier.height(50.dp), shape = RoundedCornerShape(12.dp), color = color.copy(alpha = 0.1f), contentColor = color, border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.3f))) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.padding(horizontal = 8.dp)) {
+            Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+fun shareToSocial(context: Context, videos: List<VideoItem>, packageName: String) {
+    val uris = ArrayList(videos.map { video ->
+        val file = File(video.uri.path ?: "")
+        FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+    })
+    val intent = Intent(if (uris.size > 1) Intent.ACTION_SEND_MULTIPLE else Intent.ACTION_SEND).apply {
+        type = "video/mp4"
+        if (uris.size > 1) putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris) else putExtra(Intent.EXTRA_STREAM, uris.first())
+        setPackage(packageName)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    try { context.startActivity(intent) } catch (e: Exception) { context.startActivity(Intent.createChooser(intent, "Share to $packageName")) }
 }
 
 fun shareVideo(context: Context, file: File) {
