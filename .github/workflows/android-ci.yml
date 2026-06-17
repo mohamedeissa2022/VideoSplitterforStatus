@@ -1,58 +1,105 @@
-name: Android Production CI
+# name: Android Production CI
+
+# on:
+#   push:
+#     branches: [ "main" ]
+#   pull_request:
+#     branches: [ "main" ]
+
+# jobs:
+#   test:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - uses: actions/checkout@v4
+
+#       - name: Setup JDK
+#         uses: actions/setup-java@v4
+#         with:
+#           distribution: temurin
+#           java-version: 17
+
+#       - name: Make gradlew executable
+#         run: chmod +x gradlew
+
+#       - name: Run Lint
+#         run: ./gradlew lint
+
+#       - name: Run Unit Tests
+#         run: ./gradlew test
+
+#       - name: Upload Test Reports
+#         uses: actions/upload-artifact@v4
+#         if: always()
+#         with:
+#           name: test-reports
+#           path: app/build/reports/tests/
+
+#   build:
+#     needs: test
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - uses: actions/checkout@v4
+
+#       - name: Setup JDK
+#         uses: actions/setup-java@v4
+#         with:
+#           distribution: temurin
+#           java-version: 17
+
+#       - name: Build Release AAB
+#         run: ./gradlew bundleRelease
+
+#       - name: Upload AAB
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: release-aab
+#           path: app/build/outputs/bundle/release/*.aab
+
+
+name: Android Jetpack Compose CI/CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
   pull_request:
     branches: [ "main" ]
 
 jobs:
-  test:
+  build_and_test:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout the code
+      uses: actions/checkout@v4
 
-      - name: Setup JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
+    # تطبيقات Compose الحديثة تحتاج إصدار جافا حديث (غالباً Java 17 أو 21)
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+        cache: 'gradle' # تفعيل الكاش لتسريع الـ Build في المرات القادمة
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
 
-      - name: Run Lint
-        run: ./gradlew lint
+    # 1. تشغيل الفحوصات والكود لينتر (Linting & Formatting)
+    - name: Run Linter (Checkstyle/Ktlint if configured)
+      run: ./gradlew lintDebug
 
-      - name: Run Unit Tests
-        run: ./gradlew test
+    # 2. تشغيل اختبارات الوحدة (Unit Tests)
+    - name: Run Unit Tests
+      run: ./gradlew testDebugUnitTest
 
-      - name: Upload Test Reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-reports
-          path: app/build/reports/tests/
+    # 3. بناء نسخة تجريبية (Debug APK) للتأكد أن الكود يتجمع بدون أخطاء
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug
 
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Build Release AAB
-        run: ./gradlew bundleRelease
-
-      - name: Upload AAB
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-aab
-          path: app/build/outputs/bundle/release/*.aab
+    # 4. حفظ الـ APK الناتج كملف قابل للتحميل من جيتهاب (اختياري)
+    - name: Upload Debug APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-debug
+        path: app/build/outputs/apk/debug/app-debug.apk
