@@ -23,15 +23,38 @@ fun ProcessingScreen(
     val progress = workInfo?.progress?.getInt("PROGRESS", 0) ?: 0
     val state = workInfo?.state
 
-    // 3. Navigate away when finished
-    LaunchedEffect(state) {
-        if (state == WorkInfo.State.SUCCEEDED) {
-            val outputDir = workInfo?.outputData?.getString("OUTPUT_DIR") ?: ""
+    var navigated by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state)
+    {
+        if (state == WorkInfo.State.SUCCEEDED && !navigated)
+        {
+            navigated = true
+
+            val outputDir =
+                workInfo?.outputData?.getString("OUTPUT_DIR") ?: ""
+
             onProcessComplete(outputDir)
-        } else if (state == WorkInfo.State.CANCELLED) {
+        } else if ((state == WorkInfo.State.CANCELLED || state == WorkInfo.State.FAILED) && !navigated) {
+            navigated = true
             onProcessCancelled()
         }
     }
+
+    // 3. Navigate away when finished
+//    LaunchedEffect(state) {
+//
+//        if (state == WorkInfo.State.SUCCEEDED) {
+//            android.util.Log.d("PROCESSING", "SUCCEEDED callback fired")
+//            val outputDir = workInfo?.outputData?.getString("OUTPUT_DIR") ?: ""
+//            android.util.Log.d("RESULT_SCREEN", "Path = $outputDir SUCCEEDED")
+//
+//            onProcessComplete(outputDir)
+//        } else if (state == WorkInfo.State.CANCELLED) {
+//            android.util.Log.d("RESULT_SCREEN_Canceled", "Canceled")
+//            onProcessCancelled()
+//        }
+//    }
 
     Scaffold { paddingValues ->
         Column(

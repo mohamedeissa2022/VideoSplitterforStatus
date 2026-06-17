@@ -70,8 +70,12 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
     // Video Processing
-   // implementation("io.github.nikita36078:ffmpeg-kit:6.0.LTS")
-    implementation(libs.ffmpeg.kit.full)
+    //implementation(libs.ffmpeg.kit.full.gpl)
+
+    //implementation("com.arthenica:ffmpeg-kit-full:6.0-2")
+    //implementation(libs.ffmpeg.kit.full)
+
+
     // Monetization & Analytics
     implementation("com.google.android.gms:play-services-ads:23.0.0")
     implementation("com.google.firebase:firebase-analytics-ktx:21.5.1")
@@ -79,4 +83,8 @@ dependencies {
 
     // Material Icons
     implementation("androidx.compose.material:material-icons-extended")
+
+    // Video Playback (Media3)
+    implementation("androidx.media3:media3-exoplayer:1.3.1")
+    implementation("androidx.media3:media3-ui:1.3.1")
 }

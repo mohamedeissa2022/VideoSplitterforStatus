@@ -1,5 +1,6 @@
 package com.mohadev.videosplitterforstatus
 
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -68,34 +69,32 @@ class MainActivity : ComponentActivity() {
                         onNavigateToSettings = { /* TODO */ }
                     )
                 }
-
+                var encodedPath: String= ""
+                var _outputDirPath: String=""
                 // 3. Processing Screen (Loading)
                 composable("processing") {
                     ProcessingScreen(
                         viewModel = homeViewModel,
                         onProcessComplete = { outputDirPath ->
-                            // 1. Check if we should show an ad
-                            if (adManager.shouldShowInterstitial()) {
-                                // Logic to trigger AdMob Interstitial
-                                adHelper.showInterstitial(this@MainActivity) { OnDesmisedAd() }
-                            }else{
-                                // 2. Then proceed to Results
-                                navController.navigate("results/$outputDirPath") {
-                                    popUpTo("home") { inclusive = true }
-                                }
+
+                            val encodedPath = Uri.encode(outputDirPath)
+
+                            navController.navigate("results/$encodedPath") {
+                                popUpTo("home") { inclusive = true }
                             }
-
-
                         },
                         onProcessCancelled = {
                             navController.popBackStack()
                         }
                     )
                 }
-
                 // 4. Results Screen
                 composable("results/{outputDirPath}") { backStackEntry ->
-                    val path = backStackEntry.arguments?.getString("outputDirPath") ?: ""
+
+                    val path = Uri.decode(
+                        backStackEntry.arguments?.getString("outputDirPath") ?: ""
+                    )
+
                     ResultsScreen(
                         outputDirPath = path,
                         onNavigateHome = {

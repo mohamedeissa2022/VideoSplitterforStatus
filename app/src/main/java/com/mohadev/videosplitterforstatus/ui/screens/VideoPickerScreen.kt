@@ -31,10 +31,14 @@ fun VideoPickerScreen(
                 // Success! Pass the URI back to your navigation graph/ViewModel
                 //val context = LocalContext.current
 
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
+                try {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (e: Exception) {
+                    android.util.Log.e("VideoPickerScreen", "Failed to take persistable URI permission", e)
+                }
                 onVideoSelected(uri)
 
             } else {
