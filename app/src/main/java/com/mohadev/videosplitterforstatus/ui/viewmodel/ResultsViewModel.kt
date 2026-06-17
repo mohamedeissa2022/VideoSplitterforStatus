@@ -1,4 +1,4 @@
-package com.mohadev.videosplitterforstatus.domain
+package com.mohadev.videosplitterforstatus.ui.viewmodel
 
 import android.content.Context
 import androidx.compose.runtime.State

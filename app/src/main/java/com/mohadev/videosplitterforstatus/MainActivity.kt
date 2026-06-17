@@ -1,11 +1,15 @@
 package com.mohadev.videosplitterforstatus
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,7 +18,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -22,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
@@ -29,35 +33,26 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.mohadev.videosplitterforstatus.ui.screens.*
 import com.mohadev.videosplitterforstatus.ui.theme.VideoSplitterForStatusTheme
+import com.mohadev.videosplitterforstatus.ui.viewmodel.HomeViewModel
+import com.mohadev.videosplitterforstatus.ui.viewmodel.HistoryViewModel
 import dagger.hilt.android.AndroidEntryPoint
-
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
+import java.util.Date
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    @javax.inject.Inject lateinit var remoteConfig: RemoteConfigManager
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            Log.d("MainActivity", "Notification permission granted")
-        } else {
-            Log.d("MainActivity", "Notification permission denied")
-        }
-    }
+    ) { isGranted: Boolean -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         
-        // Request Notification Permission for Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
-                PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
@@ -67,10 +62,9 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val homeViewModel: HomeViewModel = hiltViewModel()
 
-                var selectedVideoPath by remember { mutableStateOf("") }
-                var selectedVideoName by remember { mutableStateOf("") }
+                var selectedBrandingList by remember { mutableStateOf<List<VideoBranding>>(emptyList()) }
                 var selectedDuration by remember { mutableIntStateOf(30) }
-                val remoteConfig: RemoteConfigManager= RemoteConfigManager()
+                
                 LaunchedEffect(intent) {
                     intent.getStringExtra("TARGET_ROUTE")?.let { route ->
                         navController.navigate(route)
@@ -81,30 +75,27 @@ class MainActivity : ComponentActivity() {
                 var showRateDialog by remember { mutableStateOf(false) }
                 
                 LaunchedEffect(Unit) {
-
-                    // Check for updates
-                    val currentVersion = packageManager.getPackageInfo(packageName, 0).versionCode.toLong()
-                    val _updateVersion=remoteConfig.getUpdateVersion()
-                    Log.d("RemoteConfig_App_Update:","CurrVersion:$currentVersion\tUpdate Version:$_updateVersion")
-                    if (_updateVersion > currentVersion) {
-                        showUpdateDialog = true
+                    try {
+                        val currentVersion = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0)).longVersionCode
+                        } else {
+                            @Suppress("DEPRECATION")
+                            packageManager.getPackageInfo(packageName, 0).versionCode.toLong()
+                        }
+                        val _updateVersion = remoteConfig.getUpdateVersion()
+                        if (_updateVersion > currentVersion) {
+                            showUpdateDialog = true
+                        }
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Update check failed", e)
                     }
                 }
 
                 NavHost(navController = navController, startDestination = "picker") {
                     composable("picker") {
                         VideoPickerScreen(
-                            onVideoSelected = { uri ->
-                                try {
-                                    contentResolver.takePersistableUriPermission(
-                                        uri,
-                                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                                    )
-                                } catch (e: Exception) {
-                                    Log.e("MainActivity", "Failed to take permission", e)
-                                }
-                                selectedVideoPath = uri.toString()
-                                selectedVideoName = uri.lastPathSegment ?: "Split Video"
+                            onVideosSelected = { brandingList ->
+                                selectedBrandingList = brandingList
                                 navController.navigate("home")
                             },
                             context = this@MainActivity,
@@ -116,12 +107,12 @@ class MainActivity : ComponentActivity() {
                         HomeScreen(
                             onPresetSelected = { preset ->
                                 selectedDuration = preset.durationSeconds
-                                homeViewModel.startVideoSplit(selectedVideoPath, selectedVideoName, selectedDuration)
+                                homeViewModel.startBatchSplitWithBranding(selectedBrandingList, selectedDuration)
                                 navController.navigate("processing")
                             },
                             onCustomSplitSelected = { seconds ->
                                 selectedDuration = seconds
-                                homeViewModel.startVideoSplit(selectedVideoPath, selectedVideoName, selectedDuration)
+                                homeViewModel.startBatchSplitWithBranding(selectedBrandingList, selectedDuration)
                                 navController.navigate("processing")
                             },
                             onNavigateToSettings = { /* TODO */ },
@@ -134,7 +125,6 @@ class MainActivity : ComponentActivity() {
                             viewModel = homeViewModel,
                             onProcessComplete = { outputDirPath ->
                                 val encodedPath = Uri.encode(outputDirPath)
-
                                 showRateDialog = true
                                 navController.navigate("results/$encodedPath") {
                                     popUpTo("home") { inclusive = true }
@@ -175,9 +165,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (showRateDialog) {
-                    RateAppDialog(
-                        onDismiss = { showRateDialog = false }
-                    )
+                    RateAppDialog(onDismiss = { showRateDialog = false })
                 }
             }
         }
@@ -191,43 +179,15 @@ fun UpdateDialog(desc: String, link: String, isForced: Boolean, onDismiss: () ->
         onDismissRequest = { if (!isForced) onDismiss() },
         properties = DialogProperties(dismissOnBackPress = !isForced, dismissOnClickOutside = !isForced)
     ) {
-        Surface(
-            shape = RoundedCornerShape(28.dp),
-            tonalElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    Icons.Default.SystemUpdate,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
+        Surface(shape = RoundedCornerShape(28.dp), tonalElevation = 6.dp, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.SystemUpdate, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(24.dp))
-                Text(
-                    stringResource(R.string.update_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                Text(stringResource(R.string.update_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(16.dp))
-                Text(
-                    desc,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text(desc, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(32.dp))
-                Button(
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link))
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
+                Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link))) }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) {
                     Text(stringResource(R.string.update_button), fontWeight = FontWeight.Bold)
                 }
                 if (!isForced) {
@@ -250,9 +210,8 @@ fun RateAppDialog(onDismiss: () -> Unit) {
         confirmButton = {
             Button(onClick = {
                 val packageName = context.packageName
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName"))
                 try {
-                    context.startActivity(intent)
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName")))
                 } catch (e: Exception) {
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName")))
                 }
@@ -262,9 +221,7 @@ fun RateAppDialog(onDismiss: () -> Unit) {
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.remind_later))
-            }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.remind_later)) }
         },
         shape = RoundedCornerShape(28.dp)
     )

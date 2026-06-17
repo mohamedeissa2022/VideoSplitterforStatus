@@ -1,4 +1,4 @@
-package com.mohadev.videosplitterforstatus
+package com.mohadev.videosplitterforstatus.domain.model
 
 import android.graphics.Bitmap
 import android.net.Uri

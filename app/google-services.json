@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "543383657802",
+    "firebase_url": "https://video-splitter-559fc-default-rtdb.firebaseio.com",
     "project_id": "video-splitter-559fc",
     "storage_bucket": "video-splitter-559fc.firebasestorage.app"
   },

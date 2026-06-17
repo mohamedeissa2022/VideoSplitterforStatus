@@ -2,6 +2,7 @@ package com.mohadev.videosplitterforstatus
 
 import android.util.Log
 import com.google.firebase.Firebase
+import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import com.google.firebase.remoteconfig.remoteConfig
 import com.google.firebase.remoteconfig.remoteConfigSettings
 import javax.inject.Inject
@@ -10,48 +11,64 @@ import javax.inject.Singleton
 @Singleton
 class RemoteConfigManager @Inject constructor() {
 
-    private val remoteConfig = Firebase.remoteConfig
+    private val remoteConfig: FirebaseRemoteConfig? by lazy { 
+        try {
+            Firebase.remoteConfig
+        } catch (e: Exception) {
+            Log.e("RemoteConfig", "Firebase not initialized or missing google-services.json")
+            null
+        }
+    }
 
     init {
-        val configSettings = remoteConfigSettings {
-            minimumFetchIntervalInSeconds = 1200 // 20 Mintus
-        }
-        remoteConfig.setConfigSettingsAsync(configSettings)
+        setupDefaults()
+    }
 
-        val defaults = mapOf(
-            "app_update_version" to 1L,
-            "app_update_desc" to "A new version of Video Splitter is available with better performance and fixes.",
-            "app_update_link" to "https://play.google.com/store/apps/details?id=com.mohadev.videosplitterforstatus",
-            "force_update" to false
-        )
-        remoteConfig.setDefaultsAsync(defaults)
+    private fun setupDefaults() {
+        try {
+            val config = remoteConfig ?: return
+            
+            val configSettings = remoteConfigSettings {
+                minimumFetchIntervalInSeconds = 3600 
+            }
+            config.setConfigSettingsAsync(configSettings)
+            
+            val defaults = mapOf(
+                "app_update_version" to 1L,
+                "app_update_desc" to "A new version of Video Splitter is available with better performance and fixes.",
+                "app_update_link" to "https://play.google.com/store/apps/details?id=com.mohadev.videosplitterforstatus",
+                "force_update" to false
+            )
+            config.setDefaultsAsync(defaults)
+        } catch (e: Exception) {
+            Log.e("RemoteConfig", "Error setting defaults", e)
+        }
     }
 
     fun fetchAndActivate(onComplete: () -> Unit = {}) {
-        remoteConfig.fetchAndActivate()
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    Log.d("RemoteConfig", "Config params updated")
-                } else {
-                    Log.e("RemoteConfig", "Config fetch failed")
+        val config = remoteConfig
+        if (config == null) {
+            onComplete()
+            return
+        }
+        
+        try {
+            config.fetchAndActivate()
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        Log.d("RemoteConfig", "Config params updated")
+                    } else {
+                        Log.e("RemoteConfig", "Config fetch failed")
+                    }
+                    onComplete()
                 }
-                onComplete()
-            }
+        } catch (e: Exception) {
+            onComplete()
+        }
     }
 
-    fun getBannerId(): String = remoteConfig.getString("ad_banner_id")
-    fun getInterstitialId(): String = remoteConfig.getString("ad_interstitial_id")
-    fun getRewardedId(): String = remoteConfig.getString("ad_rewarded_id")
-    fun getAppOpenId(): String = remoteConfig.getString("ad_app_open_id")
-    fun getNativeId(): String = remoteConfig.getString("ad_native_id")
-    fun  getAllKeysValues(): MutableMap<String, String>{
-        val maps=mutableMapOf<String, String>()
-        remoteConfig.all.forEach { key, value -> maps[key] = value.asString() }
-        return  maps
-    }
-
-    fun getUpdateVersion(): Long = remoteConfig.getLong("app_update_version")
-    fun getUpdateDesc(): String = remoteConfig.getString("app_update_desc")
-    fun getUpdateLink(): String = remoteConfig.getString("app_update_link")
-    fun isUpdateForced(): Boolean = remoteConfig.getBoolean("force_update")
+    fun getUpdateVersion(): Long = try { remoteConfig?.getLong("app_update_version") ?: 0L } catch(e: Exception) { 0L }
+    fun getUpdateDesc(): String = try { remoteConfig?.getString("app_update_desc") ?: "" } catch(e: Exception) { "" }
+    fun getUpdateLink(): String = try { remoteConfig?.getString("app_update_link") ?: "" } catch(e: Exception) { "" }
+    fun isUpdateForced(): Boolean = try { remoteConfig?.getBoolean("force_update") ?: false } catch(e: Exception) { false }
 }

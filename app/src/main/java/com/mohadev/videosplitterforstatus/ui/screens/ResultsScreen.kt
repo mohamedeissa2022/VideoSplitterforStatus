@@ -6,7 +6,9 @@ import android.content.Intent
 import android.text.format.Formatter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,8 +42,7 @@ import coil.request.ImageRequest
 import coil.request.videoFrameMillis
 import com.mohadev.videosplitterforstatus.R
 import com.mohadev.videosplitterforstatus.VideoItem
-
-import com.mohadev.videosplitterforstatus.domain.loadVideosFromDir
+import com.mohadev.videosplitterforstatus.domain.loadVideosGrouped
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,13 +52,12 @@ fun ResultsScreen(
     context: Context = LocalContext.current,
     onNavigateHome: () -> Unit
 ) {
-    val videos = remember { mutableStateOf<List<VideoItem>>(emptyList()) }
-    val selectedIndices = remember { mutableStateListOf<Int>() }
+    // Grouped videos by original source: "v0" -> List of parts, "v1" -> List of parts
+    val groupedVideos = remember { mutableStateOf<Map<String, List<VideoItem>>>(emptyMap()) }
     var showPlayerDialog by remember { mutableStateOf<VideoItem?>(null) }
 
     LaunchedEffect(outputDirPath) {
-        val loadedVideos = loadVideosFromDir(outputDirPath, context)
-        videos.value = loadedVideos
+        groupedVideos.value = loadVideosGrouped(outputDirPath, context)
     }
 
     Scaffold(
@@ -77,147 +77,32 @@ fun ResultsScreen(
                             contentDescription = stringResource(R.string.back_content_description)
                         )
                     }
-                },
-                actions = {
-                    TextButton(onClick = {
-                        if (selectedIndices.size == videos.value.size) {
-                            selectedIndices.clear()
-                        } else {
-                            selectedIndices.clear()
-                            selectedIndices.addAll(videos.value.indices)
-                        }
-                    }) {
-                        Text(
-                            if (selectedIndices.size == videos.value.size) 
-                                stringResource(R.string.deselect_all) 
-                            else 
-                                stringResource(R.string.select_all),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
             )
-        },
-        bottomBar = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp)
-            ) {
-                if (selectedIndices.isNotEmpty()) {
-                    val selectedVideos = remember(selectedIndices, videos.value) {
-                        selectedIndices.sorted().map { videos.value[it] }
-                    }
-                    
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Button(
-                            onClick = { shareMultipleVideos(context, selectedVideos) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(60.dp)
-                                .shadow(8.dp, RoundedCornerShape(16.dp)),
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Icon(Icons.Default.Share, contentDescription = null)
-                            Spacer(Modifier.width(12.dp))
-                            Text(
-                                stringResource(R.string.share_selected, selectedIndices.size),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        // Social Media Quick Share Bar
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            SocialShareButton(
-                                icon = Icons.Default.Share,
-                                label = "WhatsApp",
-                                color = Color(0xFF25D366),
-                                modifier = Modifier.weight(1f),
-                                onClick = { shareToSocial(context, selectedVideos, "com.whatsapp") }
-                            )
-                            SocialShareButton(
-                                icon = Icons.Default.Share,
-                                label = "Instagram",
-                                color = Color(0xFFE4405F),
-                                modifier = Modifier.weight(1f),
-                                onClick = { shareToSocial(context, selectedVideos, "com.instagram.android") }
-                            )
-                            SocialShareButton(
-                                icon = Icons.Default.Share,
-                                label = "Facebook",
-                                color = Color(0xFF1877F2),
-                                modifier = Modifier.weight(1f),
-                                onClick = { shareToSocial(context, selectedVideos, "com.facebook.katana") }
-                            )
-                        }
-                    }
-                }
-                //BannerAdView()
-            }
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Text(
-                text = stringResource(R.string.split_videos_label),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 24.dp)
-            )
-
-            if (videos.value.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize().weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        stringResource(R.string.no_files_found),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                Spacer(modifier = Modifier.height(20.dp))
+        if (groupedVideos.value.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                contentPadding = PaddingValues(bottom = 24.dp)
+            ) {
+                // Get sorted keys to maintain batch order
+                val sortedKeys = groupedVideos.value.keys.sortedBy { it.removePrefix("v").toIntOrNull() ?: 0 }
                 
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth().height(320.dp),
-                    contentPadding = PaddingValues(horizontal = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    itemsIndexed(videos.value) { index, video ->
-                        VideoItemCard(
-                            video = video,
-                            isSelected = selectedIndices.contains(index),
-                            onToggleSelection = {
-                                if (selectedIndices.contains(index)) {
-                                    selectedIndices.remove(index)
-                                } else {
-                                    selectedIndices.add(index)
-                                }
-                            },
-                            onPreview = { showPlayerDialog = video }
+                sortedKeys.forEach { videoKey ->
+                    val parts = groupedVideos.value[videoKey] ?: emptyList()
+                    item {
+                        VideoGroupSection(
+                            title = "Video ${videoKey.removePrefix("v").toIntOrNull()?.let { it + 1 } ?: videoKey}",
+                            parts = parts,
+                            onPreview = { showPlayerDialog = it }
                         )
                     }
-                }
-
-                Spacer(Modifier.height(32.dp))
-                
-                Box(modifier = Modifier.padding(horizontal = 24.dp)) {
-                    //NativeAdViewComposable()
                 }
             }
         }
@@ -229,117 +114,102 @@ fun ResultsScreen(
 }
 
 @Composable
-fun VideoItemCard(
+fun VideoGroupSection(
+    title: String,
+    parts: List<VideoItem>,
+    onPreview: (VideoItem) -> Unit
+) {
+    val context = LocalContext.current
+    
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold
+            )
+            
+            TextButton(onClick = { shareMultipleVideos(context, parts) }) {
+                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Share All")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxWidth().height(260.dp)
+        ) {
+            items(parts) { video ->
+                VideoItemCardMinimal(
+                    video = video,
+                    onPreview = { onPreview(video) }
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+@Composable
+fun VideoItemCardMinimal(
     video: VideoItem,
-    isSelected: Boolean,
-    onToggleSelection: () -> Unit,
     onPreview: () -> Unit
 ) {
     val context = LocalContext.current
     val fileSize = remember(video.uri) {
-        try {
-            File(video.uri.path ?: "").length()
-        } catch (e: Exception) { 0L }
+        try { File(video.uri.path ?: "").length() } catch (e: Exception) { 0L }
     }
 
     Card(
-        modifier = Modifier
-            .width(220.dp)
-            .fillMaxHeight()
-            .shadow(if (isSelected) 16.dp else 4.dp, RoundedCornerShape(24.dp)),
+        modifier = Modifier.width(180.dp).fillMaxHeight(),
         onClick = onPreview,
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) 
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-            else 
-                MaterialTheme.colorScheme.surface
-        ),
-        border = if (isSelected) 
-            androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-        else null
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Column(modifier = Modifier.padding(10.dp)) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
-                    .clip(RoundedCornerShape(16.dp)),
+                modifier = Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(video.uri)
-                        .decoderFactory { result, options, _ ->
-                            VideoFrameDecoder(result.source, options)
-                        }
+                        .decoderFactory { result, options, _ -> VideoFrameDecoder(result.source, options) }
                         .videoFrameMillis(1000)
                         .build(),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
-                
-                // Play Icon Overlay
-                Surface(
-                    shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.4f),
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.padding(12.dp),
-                        tint = Color.White
-                    )
+                Surface(shape = CircleShape, color = Color.Black.copy(0.4f), modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.padding(8.dp), tint = Color.White)
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Text(
-                text = video.name,
-                maxLines = 1,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            
-            Text(
-                text = Formatter.formatFileSize(context, fileSize),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(video.name, maxLines = 1, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Text(Formatter.formatFileSize(context, fileSize), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             Spacer(Modifier.weight(1f))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            IconButton(
+                onClick = { shareVideo(context, File(video.uri.path ?: "")) },
+                modifier = Modifier.align(Alignment.End),
+                colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(0.4f))
             ) {
-                IconButton(
-                    onClick = { shareVideo(context, File(video.uri.path ?: "")) },
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                    )
-                ) {
-                    Icon(
-                        Icons.Default.Share, 
-                        contentDescription = stringResource(R.string.share_content_description),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = { onToggleSelection() },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = MaterialTheme.colorScheme.primary
-                    )
-                )
+                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -357,82 +227,13 @@ fun VideoPlayerDialog(video: VideoItem, onDismiss: () -> Unit) {
     }
 
     DisposableEffect(Unit) {
-        onDispose {
-            exoPlayer.release()
-        }
+        onDispose { exoPlayer.release() }
     }
 
     Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(32.dp),
-            tonalElevation = 8.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(9f/16f),
-            color = Color.Black
-        ) {
-            AndroidView(
-                factory = { ctx ->
-                    PlayerView(ctx).apply {
-                        player = exoPlayer
-                        useController = true
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
+        Surface(shape = RoundedCornerShape(32.dp), tonalElevation = 8.dp, modifier = Modifier.fillMaxWidth().aspectRatio(9f/16f), color = Color.Black) {
+            AndroidView(factory = { ctx -> PlayerView(ctx).apply { player = exoPlayer; useController = true } }, modifier = Modifier.fillMaxSize())
         }
-    }
-}
-
-@Composable
-fun SocialShareButton(
-    icon: ImageVector,
-    label: String,
-    color: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier.height(50.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = color.copy(alpha = 0.1f),
-        contentColor = color,
-        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.3f))
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 8.dp)
-        ) {
-            Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(4.dp))
-            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-fun shareToSocial(context: Context, videos: List<VideoItem>, packageName: String) {
-    val uris = ArrayList(videos.map { video ->
-        val file = File(video.uri.path ?: "")
-        FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-    })
-
-    val intent = Intent(if (uris.size > 1) Intent.ACTION_SEND_MULTIPLE else Intent.ACTION_SEND).apply {
-        type = "video/mp4"
-        if (uris.size > 1) {
-            putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
-        } else {
-            putExtra(Intent.EXTRA_STREAM, uris.first())
-        }
-        setPackage(packageName)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    
-    try {
-        context.startActivity(intent)
-    } catch (e: Exception) {
-        context.startActivity(Intent.createChooser(intent, "Share to $packageName"))
     }
 }
 
@@ -452,7 +253,6 @@ fun shareMultipleVideos(context: Context, videos: List<VideoItem>) {
         val file = File(video.uri.path ?: "")
         uris.add(FileProvider.getUriForFile(context, "${context.packageName}.provider", file))
     }
-
     val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
         type = "video/mp4"
         putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)

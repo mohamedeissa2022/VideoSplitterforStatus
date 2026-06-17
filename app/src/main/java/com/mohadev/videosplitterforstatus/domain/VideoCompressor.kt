@@ -25,6 +25,11 @@ object VideoCompressor {
         
         Log.d("VideoCompressor", "Process Start: $inputUriString with bitrate $targetBitrate")
 
+        // 🛠️ Dynamic Tuning for Compression (80% Rule)
+        val profile = DeviceSpecs.getProfile(context)
+        val params = DeviceSpecs.getEncodingParams(profile)
+        val threads = params.threads
+
         val resolvedFile = getFileFromUri(context, Uri.parse(inputUriString))
         if (resolvedFile == null || !resolvedFile.exists()) {
             Log.e("VideoCompressor", "Error: Input file missing or copy failed")
@@ -36,7 +41,7 @@ object VideoCompressor {
 
         val outputFile = File(outputDir, "compressed_${System.currentTimeMillis()}.mp4")
         
-        val command = "-y -i \"${resolvedFile.absolutePath}\" -vcodec h264_mediacodec -b:v $targetBitrate -maxrate $targetBitrate -bufsize 1000k -vf \"scale=trunc(iw/2)*2:trunc(ih/2)*2,scale=-2:480,format=yuv420p\" -acodec aac -b:a 48k \"${outputFile.absolutePath}\""
+        val command = "-y -threads $threads -i \"${resolvedFile.absolutePath}\" -vcodec h264_mediacodec -b:v $targetBitrate -maxrate $targetBitrate -bufsize 1000k -vf \"scale=trunc(iw/2)*2:trunc(ih/2)*2,scale=-2:480,format=yuv420p\" -acodec aac -b:a 48k \"${outputFile.absolutePath}\""
 
         Log.d("VideoCompressor", "Executing Smart Compression: $command")
         

@@ -3,8 +3,8 @@ package com.mohadev.videosplitterforstatus.di
 import android.content.Context
 import androidx.room.Room
 import androidx.work.WorkManager
-import com.mohadev.videosplitterforstatus.domain.AppDatabase
-import com.mohadev.videosplitterforstatus.domain.HistoryDao
+import com.mohadev.videosplitterforstatus.data.local.AppDatabase
+import com.mohadev.videosplitterforstatus.data.local.HistoryDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -23,7 +23,7 @@ object AppModule {
             context,
             AppDatabase::class.java,
             "video_splitter_db"
-        ).build()
+        ).fallbackToDestructiveMigration().build()
     }
 
     @Provides

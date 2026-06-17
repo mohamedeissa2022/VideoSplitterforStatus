@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
-    id("com.google.gms.google-services")
+
     id("com.google.firebase.crashlytics")
 }
 
@@ -84,8 +84,7 @@ dependencies {
     implementation("com.moizhassan.ffmpeg:ffmpeg-kit-16kb:6.1.1")
 
 
-    // Monetization & Analytics
-   // implementation("com.google.android.gms:play-services-ads:23.0.0")
+    // Analytics & Crashlytics
     implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
     implementation("com.google.firebase:firebase-analytics-ktx")
     implementation("com.google.firebase:firebase-crashlytics-ktx")
